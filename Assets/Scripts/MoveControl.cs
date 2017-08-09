@@ -369,12 +369,6 @@ public class MoveControl : MonoBehaviour
         Follow,
         Attacking
     }
-    public enum Mode
-    {
-        RandomMovement,
-        Waypoints,
-        RandomPointInFOW
-    }
     public void SetAnimatorState(string state)
     {
         switch (state)
@@ -402,3 +396,9 @@ public class MoveControl : MonoBehaviour
         }
     }
 }
+    public enum Mode
+    {
+        RandomMovement,
+        Waypoints,
+        RandomPointInFOW
+    }

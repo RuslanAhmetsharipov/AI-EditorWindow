@@ -66,7 +66,7 @@ public class AttackTypeEditor : EditorWindow
                         attackType.attackType[i].damage = EditorGUILayout.FloatField("Damage", attackType.attackType[i].damage);
                         attackType.attackType[i].range = EditorGUILayout.FloatField("Range of attacks", attackType.attackType[i].range);
                         attackType.attackType[i].CoolDownForAttack = EditorGUILayout.FloatField("CoolDownForAttack", attackType.attackType[i].CoolDownForAttack);
-                        attackType.attackType[i].damageType =(DamageType)EditorGUILayout.EnumPopup(attackType.attackType[i].damageType);
+                        attackType.attackType[i].damageType =(DamageType)EditorGUILayout.EnumPopup("Damage Type",attackType.attackType[i].damageType);
                         attackType.hitDealer[i] = (HitDealer)EditorGUILayout.ObjectField("Hit dealer of attack: ", attackType.hitDealer[i], typeof(HitDealer), true);
                         attackType.attackType[i] = EditorGUILayout.ObjectField(attackType.attackType[i], typeof(NPCAttackType), true) as NPCAttackType;
                         GUILayout.BeginHorizontal();
@@ -124,6 +124,7 @@ public class AttackTypeEditor : EditorWindow
                 EditorGUILayout.LabelField("Name of asset");
                 movingType.movingType.name = GUILayout.TextField(movingType.movingType.name);
                 GUILayout.EndHorizontal();
+                movingType.movementMode =(Mode)EditorGUILayout.EnumPopup("Movement mode", movingType.movementMode);
                 movingType.movingType.speed = EditorGUILayout.FloatField("Moving Speed", movingType.movingType.speed);
                 movingType.movingType.timeForIdle = EditorGUILayout.FloatField("Time For Idle", movingType.movingType.timeForIdle);
                 GUILayout.BeginHorizontal();
@@ -171,13 +172,13 @@ public class AttackTypeEditor : EditorWindow
                     {
                         movingType = Selection.activeGameObject.AddComponent<MoveControl>();
                         movingType.movingType = CreateInstance<MovingType>();
-                        movingType.movementMode = MoveControl.Mode.RandomPointInFOW;
+                        movingType.movementMode = Mode.RandomPointInFOW;
                     }
                 }
                 else
                 {
                     movingType.movingType = CreateInstance<MovingType>();
-                    movingType.movementMode = MoveControl.Mode.RandomPointInFOW;
+                    movingType.movementMode = Mode.RandomPointInFOW;
                 }
             }
             GUILayout.Space(35);
