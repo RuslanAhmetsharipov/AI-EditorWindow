@@ -63,9 +63,10 @@ public class AttackTypeEditor : EditorWindow
                         GUILayout.Label("Name of asset");
                         attackType.attackType[i].name = GUILayout.TextField(attackType.attackType[i].name);
                         GUILayout.EndHorizontal();
-                        attackType.attackType[i].damage = EditorGUILayout.IntField("Damage", attackType.attackType[i].damage);
+                        attackType.attackType[i].damage = EditorGUILayout.FloatField("Damage", attackType.attackType[i].damage);
                         attackType.attackType[i].range = EditorGUILayout.FloatField("Range of attacks", attackType.attackType[i].range);
                         attackType.attackType[i].CoolDownForAttack = EditorGUILayout.FloatField("CoolDownForAttack", attackType.attackType[i].CoolDownForAttack);
+                        attackType.attackType[i].damageType =(DamageType)EditorGUILayout.EnumPopup(attackType.attackType[i].damageType);
                         attackType.hitDealer[i] = (HitDealer)EditorGUILayout.ObjectField("Hit dealer of attack: ", attackType.hitDealer[i], typeof(HitDealer), true);
                         attackType.attackType[i] = EditorGUILayout.ObjectField(attackType.attackType[i], typeof(NPCAttackType), true) as NPCAttackType;
                         GUILayout.BeginHorizontal();
@@ -192,7 +193,7 @@ public class AttackTypeEditor : EditorWindow
                 healthType.healthType.name = GUILayout.TextField(healthType.healthType.name);
                 GUILayout.EndHorizontal();
                 healthType.healthType.health = EditorGUILayout.IntField("Health", healthType.healthType.health);
-                healthType.healthType.health = EditorGUILayout.IntField("Armor", healthType.healthType.armor);
+                healthType.healthType.armor = EditorGUILayout.IntField("Armor", healthType.healthType.armor);
                 healthType.healthType = EditorGUILayout.ObjectField(healthType.healthType, typeof(HealthType), true) as HealthType;
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button("Save"))

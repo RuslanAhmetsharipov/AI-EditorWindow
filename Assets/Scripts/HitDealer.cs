@@ -4,12 +4,17 @@ using UnityEngine;
 
 public class HitDealer : MonoBehaviour
 {
-    [HideInInspector]
-    public int damage = 0;
+    private float damage = 0f;
+    private DamageType damageType = DamageType.HealthAndArmor;
+    public void SetVariables(float _damage, DamageType _damageType)
+    {
+        damage = _damage;
+        damageType = _damageType;
+    }
     private void OnCollisionEnter(Collision collision)
     {
         DamageReceiver dr = collision.transform.GetComponent<DamageReceiver>();
         if (dr != null)
-            dr.ReceiveDamage(damage);
+            dr.ReceiveDamage(damage, damageType);
     }
 }

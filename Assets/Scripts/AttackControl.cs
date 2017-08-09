@@ -32,7 +32,7 @@ public class AttackControl : MonoBehaviour
     {
         for (int i = 0; i < attackType.Count; i++)
         {
-            int maxdmg = attackType[i].damage;
+            float maxdmg = attackType[i].damage;
             int num = i;
             for (int j = i + 1; j < attackType.Count; j++)
             {
@@ -75,11 +75,11 @@ public class AttackControl : MonoBehaviour
         int attackIndex = ChooseAttack();
         if (attackIndex != -1)
         {
-            //hitDealer.damage = attackType[attackIndex].damage;
-            //hitDealer.enabled = true;
+            hitDealer[attackIndex].SetVariables(attackType[attackIndex].damage, attackType[attackIndex].damageType);
             mc.SetAnimatorState("attack");
             isAttackReady[attackIndex] = false;
             timeOfAttack[attackIndex] = Time.time;
+            hitDealer[attackIndex].SetVariables(0f, attackType[attackIndex].damageType);
             return true;
         }
         return false;

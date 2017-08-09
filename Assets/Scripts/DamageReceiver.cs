@@ -1,8 +1,12 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+[RequireComponent(typeof(Collider))]
+public class DamageReceiver : MonoBehaviour
+{
+    [Range(0f, 100f)]
+    public float percentageOfReceivingDamage;
 
-public class DamageReceiver : MonoBehaviour {
     private Health hp;
     private void Start()
     {
@@ -11,8 +15,8 @@ public class DamageReceiver : MonoBehaviour {
         else
             transform.parent.gameObject.SetActive(false);
     }
-    public void ReceiveDamage(int damage)
+    public void ReceiveDamage(float damage, DamageType damageType)
     {
-        hp.ChangeHP(-1*damage);
+        hp.ReceiveDamage(damage * percentageOfReceivingDamage, damageType);
     }
 }
