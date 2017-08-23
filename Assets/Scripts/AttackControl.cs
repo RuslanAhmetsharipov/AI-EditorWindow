@@ -1,11 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 [Serializable]
 public class AttackControl : MonoBehaviour
 {
     public List<NPCAttackType> attackType = new List<NPCAttackType>();
-    [SerializeField]
     public List<HitDealer> hitDealer = new List<HitDealer>();
 
     private bool[] isAttackReady;
@@ -16,8 +16,8 @@ public class AttackControl : MonoBehaviour
 
     private void Start()
     {
-        if (attackType.Count == 0 || hitDealer == null || attackType.Count != hitDealer.Count)
-            this.gameObject.SetActive(false);
+        if (attackType.Count == 0 || attackType.Count != hitDealer.Count)
+            this.enabled = false;
         isAttackReady = new bool[attackType.Count];
         mc = GetComponent<MoveControl>();
         SortByDamage();
@@ -75,7 +75,23 @@ public class AttackControl : MonoBehaviour
         int attackIndex = ChooseAttack();
         if (attackIndex != -1)
         {
-            hitDealer[attackIndex].SetVariables(attackType[attackIndex].damage, attackType[attackIndex].damageType);
+            if (hitDealer[attackIndex] == null && attackType[attackIndex].attackingObject.GetComponent<HitDealer>() == null)
+            {
+                Debug.LogError("HitDealer not assigned");
+                return false;
+            }
+            GameObject _fireball;
+            if (attackType[attackIndex].isAttackSpawningObject)
+            {
+                Vector3 initPosition = attackType[attackIndex].startPointOfAttack.position;
+                _fireball = Instantiate(attackType[attackIndex].attackingObject, initPosition, Quaternion.identity);
+                _fireball.GetComponent<HitDealer>().SetVariables(attackType[attackIndex].damage, attackType[attackIndex].damageType);
+                StartCoroutine(MovingAttackObject(_fireball, transform.forward, attackType[attackIndex].speedOfCreatedAttack, attackType[attackIndex].lifetimeOfObject));
+            }
+            if (hitDealer[attackIndex] != null)
+            {
+                hitDealer[attackIndex].SetVariables(attackType[attackIndex].damage, attackType[attackIndex].damageType);
+            }
             mc.SetAnimatorState("attack");
             isAttackReady[attackIndex] = false;
             timeOfAttack[attackIndex] = Time.time;
@@ -83,5 +99,17 @@ public class AttackControl : MonoBehaviour
             return true;
         }
         return false;
+    }
+    private IEnumerator MovingAttackObject(GameObject obj, Vector3 direction, float speed, float lifetime)
+    {
+        float time = 0f;
+        while (time < lifetime)
+        {
+            obj.transform.position += direction * speed;
+            time += Time.deltaTime;
+            yield return new WaitForEndOfFrame();
+        }
+        Destroy(obj);
+        yield return null;
     }
 }

@@ -2,6 +2,7 @@
 using UnityEditor;
 using System.Collections.Generic;
 using System.IO;
+using UnityEditor.Animations;
 
 [System.Serializable]
 public class AttackTypeEditor : EditorWindow
@@ -10,7 +11,16 @@ public class AttackTypeEditor : EditorWindow
     public AttackControl attackType;
     public MoveControl movingType;
     public Health healthType;
+    public Animator animator;
 
+    private bool showAttackingObjectMenu = false;
+    private bool showAnimatorStates = false;
+    private AnimatorController animatorController;
+    private AnimatorControllerParameter[] animatorParameters;
+
+    private int listCount = 0;
+    private int listCountTemp = 0;
+    public Vector2 scrollPos = Vector2.zero;
     [MenuItem("NPCEditors/MonsterEditor")]
     static void Init()
     {
@@ -19,24 +29,26 @@ public class AttackTypeEditor : EditorWindow
 
     private void OnGUI()
     {
+        scrollPos = GUI.BeginScrollView(new Rect(0, 0, position.width, position.height), scrollPos, new Rect(0, 0, 300, 690));
         if (Selection.activeGameObject != null)
         {
 
             if (Selection.activeGameObject.GetComponent<AttackControl>() != null && attackType == null)
             {
                 attackType = Selection.activeGameObject.GetComponent<AttackControl>();
-            }
-            if (attackType.attackType == null || attackType.attackType.Count != attackType.hitDealer.Count)
-            {
-                if (attackType.attackType != null && attackType.attackType.Count > attackType.hitDealer.Count)
+
+                if (attackType.attackType == null || attackType.attackType.Count != attackType.hitDealer.Count)
                 {
-                    int i = attackType.attackType.Count - 1;
-                    while (attackType.attackType.Count != attackType.hitDealer.Count) { attackType.attackType.RemoveAt(i); i--; }
-                }
-                else
-                {
-                    int i = attackType.hitDealer.Count - 1;
-                    while (attackType.attackType.Count != attackType.hitDealer.Count) { attackType.hitDealer.RemoveAt(i); i--; }
+                    if (attackType.attackType != null && attackType.attackType.Count > attackType.hitDealer.Count)
+                    {
+                        int i = attackType.attackType.Count - 1;
+                        while (attackType.attackType.Count != attackType.hitDealer.Count) { attackType.attackType.RemoveAt(i); i--; }
+                    }
+                    else
+                    {
+                        int i = attackType.hitDealer.Count - 1;
+                        while (attackType.attackType.Count != attackType.hitDealer.Count) { attackType.hitDealer.RemoveAt(i); i--; }
+                    }
                 }
             }
             if (Selection.activeGameObject.GetComponent<MoveControl>() != null && movingType == null)
@@ -47,6 +59,17 @@ public class AttackTypeEditor : EditorWindow
             if (Selection.activeGameObject.GetComponent<Health>() != null && healthType == null)
             {
                 healthType = Selection.activeGameObject.GetComponent<Health>();
+            }
+            if (Selection.activeGameObject.GetComponent<Animator>() != null && animator == null)
+            {
+                animator = Selection.activeGameObject.GetComponent<Animator>();
+                int paramsCount = animator.parameterCount;
+                animatorParameters = new AnimatorControllerParameter[paramsCount];
+                for (int i = 0; i < paramsCount; i++)
+                {
+                    animatorParameters[i] = animator.GetParameter(i);
+                }
+                movingType.animator = animator;
             }
             if (attackType != null)
             {
@@ -65,20 +88,45 @@ public class AttackTypeEditor : EditorWindow
                         GUILayout.EndHorizontal();
                         attackType.attackType[i].damage = EditorGUILayout.FloatField("Damage", attackType.attackType[i].damage);
                         attackType.attackType[i].range = EditorGUILayout.FloatField("Range of attacks", attackType.attackType[i].range);
+                        attackType.attackType[i].isRanged = EditorGUILayout.Toggle("Is this attack ranged", attackType.attackType[i].isRanged);
                         attackType.attackType[i].CoolDownForAttack = EditorGUILayout.FloatField("CoolDownForAttack", attackType.attackType[i].CoolDownForAttack);
-                        attackType.attackType[i].damageType =(DamageType)EditorGUILayout.EnumPopup("Damage Type",attackType.attackType[i].damageType);
-                        attackType.hitDealer[i] = (HitDealer)EditorGUILayout.ObjectField("Hit dealer of attack: ", attackType.hitDealer[i], typeof(HitDealer), true);
+                        attackType.attackType[i].damageType = (DamageType)EditorGUILayout.EnumPopup("Damage Type", attackType.attackType[i].damageType);
+                        attackType.attackType[i].isAttackSpawningObject = EditorGUILayout.Toggle("Is attack spawning object", attackType.attackType[i].isAttackSpawningObject);
+                        if (attackType.attackType[i].isAttackSpawningObject)
+                        {
+                            EditorGUI.indentLevel++;
+                            attackType.attackType[i].attackingObject = EditorGUILayout.ObjectField("Created object", attackType.attackType[i].attackingObject, typeof(GameObject), true) as GameObject;
+                            showAttackingObjectMenu = EditorGUILayout.Foldout(showAttackingObjectMenu, "Show more info");
+                            if (showAttackingObjectMenu && attackType.attackType[i].attackingObject.GetComponent<AttackingObject>() != null)
+                            {
+                                EditorGUI.indentLevel++;
+                                AttackingObject _attackingObject = attackType.attackType[i].attackingObject.GetComponent<AttackingObject>();
+                                _attackingObject.animationClip =
+                                    EditorGUILayout.ObjectField("Animation when hit", _attackingObject.animationClip, typeof(AnimationClip), false) as AnimationClip;
+                                _attackingObject.audioClip =
+                                    EditorGUILayout.ObjectField("Audio clip when hit", _attackingObject.audioClip, typeof(AudioClip), false) as AudioClip;
+                                EditorGUI.indentLevel--;
+                            }
+                            attackType.attackType[i].startPointOfAttack = EditorGUILayout.ObjectField("Created object base position", attackType.attackType[i].startPointOfAttack, typeof(Transform), true) as Transform;
+                            attackType.attackType[i].speedOfCreatedAttack = EditorGUILayout.FloatField("Speed of created object", attackType.attackType[i].speedOfCreatedAttack);
+                            attackType.attackType[i].lifetimeOfObject = EditorGUILayout.FloatField("LifeTime of object", attackType.attackType[i].lifetimeOfObject);
+                            if (attackType.attackType[i].attackingObject != null && attackType.attackType[i].attackingObject.GetComponent<HitDealer>() != null)
+                                attackType.hitDealer[i] = attackType.attackType[i].attackingObject.GetComponent<HitDealer>();
+                            EditorGUI.indentLevel--;
+                        }
+                        else
+                            attackType.hitDealer[i] = (HitDealer)EditorGUILayout.ObjectField("Hit dealer of attack: ", attackType.hitDealer[i], typeof(HitDealer), true);
                         attackType.attackType[i] = EditorGUILayout.ObjectField(attackType.attackType[i], typeof(NPCAttackType), true) as NPCAttackType;
                         GUILayout.BeginHorizontal();
                         if (GUILayout.Button("Save"))
                         {
                             string path = AssetDatabase.GetAssetPath(attackType.attackType[i]);
-                            if (AssetDatabase.Contains(attackType.attackType[i])&&Path.GetFileName(path)==attackType.attackType[i].name)
+                            if (AssetDatabase.Contains(attackType.attackType[i]) && Path.GetFileName(path) == attackType.attackType[i].name)
                                 EditorUtility.SetDirty(attackType.attackType[i]);
                             if (path != "")
                             {
                                 if (EditorUtility.DisplayDialog("Creating asset error", "Asset that you want to create already exist. Would you like to rename it?", "Yes", "No"))
-                                    ScriptableObjectUtility.OverwriteAsset<NPCAttackType>(attackType.attackType[i], attackType.attackType[i].name);
+                                    ScriptableObjectUtility.OverwriteAsset(attackType.attackType[i], attackType.attackType[i].name);
                             }
                             else
                             {
@@ -124,7 +172,7 @@ public class AttackTypeEditor : EditorWindow
                 EditorGUILayout.LabelField("Name of asset");
                 movingType.movingType.name = GUILayout.TextField(movingType.movingType.name);
                 GUILayout.EndHorizontal();
-                movingType.movementMode =(Mode)EditorGUILayout.EnumPopup("Movement mode", movingType.movementMode);
+
                 movingType.movingType.speed = EditorGUILayout.FloatField("Moving Speed", movingType.movingType.speed);
                 movingType.movingType.timeForIdle = EditorGUILayout.FloatField("Time For Idle", movingType.movingType.timeForIdle);
                 GUILayout.BeginHorizontal();
@@ -135,10 +183,55 @@ public class AttackTypeEditor : EditorWindow
                 EditorGUILayout.LabelField("Radius for aggresion in anyway");
                 movingType.movingType.closeAggressionDistance = EditorGUILayout.FloatField(movingType.movingType.closeAggressionDistance);
                 GUILayout.EndHorizontal();
-                GUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Change decision percentage");
-                movingType.movingType.changeDirectionPercentage = EditorGUILayout.Slider(movingType.movingType.changeDirectionPercentage, 0f, 100f);
-                GUILayout.EndHorizontal();
+                movingType.npcType = (NPCType)EditorGUILayout.EnumPopup("NPC type", movingType.npcType);
+                if (movingType.npcType != NPCType.standOnePlaceNPC)
+                    movingType.movementMode = (Mode)EditorGUILayout.EnumPopup("Movement mode", movingType.movementMode);
+                EditorGUI.indentLevel++;
+                if (movingType.movementMode == Mode.RandomMovement)
+                {
+                    GUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField("Change decision percentage");
+                    movingType.movingType.changeDirectionPercentage = EditorGUILayout.Slider(movingType.movingType.changeDirectionPercentage, 0f, 100f);
+                    GUILayout.EndHorizontal();
+                }
+                else
+                {
+                    listCount = movingType.wayPoints.Count;
+                    GUILayout.BeginHorizontal();
+                    listCountTemp = EditorGUILayout.IntField("Count of waypoints", listCountTemp);
+                    if (GUILayout.Button("Apply"))
+                    {
+                        listCount = listCountTemp;
+                    }
+                    GUILayout.EndHorizontal();
+                    for (int i = 0; i < movingType.wayPoints.Count; i++)
+                    {
+                        movingType.wayPoints[i] = EditorGUILayout.ObjectField(movingType.wayPoints[i], typeof(Transform), true) as Transform;
+                    }
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Add waypoint"))
+                    {
+                        listCount++;
+                        Repaint();
+                    }
+                    if (GUILayout.Button("Remove waypoint"))
+                    {
+                        listCount--;
+                        Repaint();
+                    }
+                    while (listCount > movingType.wayPoints.Count)
+                    {
+                        movingType.wayPoints.Add(null);
+                        listCountTemp = listCount;
+                    }
+                    while (listCount < movingType.wayPoints.Count)
+                    {
+                        movingType.wayPoints.RemoveAt(movingType.wayPoints.Count - 1);
+                        listCountTemp = listCount;
+                    }
+                    GUILayout.EndHorizontal();
+                }
+                EditorGUI.indentLevel--;
                 movingType.movingType = EditorGUILayout.ObjectField(movingType.movingType, typeof(MovingType), true) as MovingType;
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button("Save"))
@@ -172,13 +265,13 @@ public class AttackTypeEditor : EditorWindow
                     {
                         movingType = Selection.activeGameObject.AddComponent<MoveControl>();
                         movingType.movingType = CreateInstance<MovingType>();
-                        movingType.movementMode = Mode.RandomPointInFOW;
+                        movingType.movementMode = Mode.RandomMovement;
                     }
                 }
                 else
                 {
                     movingType.movingType = CreateInstance<MovingType>();
-                    movingType.movementMode = Mode.RandomPointInFOW;
+                    movingType.movementMode = Mode.RandomMovement;
                 }
             }
             GUILayout.Space(35);
@@ -240,6 +333,7 @@ public class AttackTypeEditor : EditorWindow
                 }
             }
         }
+        GUI.EndScrollView();
     }
     private void OnSelectionChange()
     {
@@ -247,5 +341,7 @@ public class AttackTypeEditor : EditorWindow
         attackType = null;
         movingType = null;
         healthType = null;
+        animator = null;
+        showAttackingObjectMenu = false;
     }
 }

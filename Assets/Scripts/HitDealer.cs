@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class HitDealer : MonoBehaviour
 {
-    private float damage = 0f;
+    public float damage = 0f;
     private DamageType damageType = DamageType.HealthAndArmor;
     public void SetVariables(float _damage, DamageType _damageType)
     {

@@ -15,6 +15,7 @@ public class Health : MonoBehaviour
     }
     public void ReceiveDamage(float _dmg, DamageType damageType)
     {
+        Debug.Log(_dmg);
         switch (damageType)
         {
             case DamageType.HealthAndArmor:
@@ -27,6 +28,11 @@ public class Health : MonoBehaviour
                         armor = 0;
                     }
                 }
+                else
+                {
+                    hp -= armor;
+                    hp -= _dmg;
+                }
                 break;
             case DamageType.OnlyArmor:
                 armor -= _dmg;
@@ -37,6 +43,7 @@ public class Health : MonoBehaviour
                 hp -= _dmg;
                 break;
         }
+        Debug.Log(hp);
         if (hp <= 0)
             Die();
     }

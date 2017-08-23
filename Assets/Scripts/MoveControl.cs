@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
@@ -8,10 +9,12 @@ using UnityEngine.SceneManagement;
 public class MoveControl : MonoBehaviour
 {
     public Mode movementMode = Mode.RandomMovement;
-    [SerializeField]
-    private List<Transform> wayPoints = new List<Transform>();
+    public NPCType npcType = NPCType.agressiveMonster;
+    public List<Transform> wayPoints = new List<Transform>();
 
     public MovingType movingType;
+    public Animator animator;
+    public bool targetDefined = false;
 
     private float timeForIdle;
     private float maxDistanceForCast;
@@ -23,7 +26,7 @@ public class MoveControl : MonoBehaviour
     private float distanceToDestination = 0f;
     private Transform player;
     private bool changePath = false;
-    [SerializeField]
+    private bool changeAnim = false;
     private States currentState;
     private AttackControl _ac;
     private int currentPoint = 0;
@@ -33,7 +36,6 @@ public class MoveControl : MonoBehaviour
     private float rotationSpeed = 5f;
     private float range = 1f;
     private NavMeshObstacle obstacle;
-    private Animator animator;
     // Use this for initialization
     void Start()
     {
@@ -51,34 +53,61 @@ public class MoveControl : MonoBehaviour
         obstacle = GetComponent<NavMeshObstacle>();
         movingSpeed = movingType.speed;
         agent.speed = movingSpeed;
-        //agent.stoppingDistance = 0.9f * range;
         animator = GetComponent<Animator>();
         if (animator == null)
         {
             Debug.LogError("animator not assigned at " + transform.name);
-            Debug.Break();
         }
         player = GameObject.FindGameObjectWithTag("Player").transform;
         if (player == null)
-            Debug.LogError("hde igrok");
-        SetPosition();
-        agent.destination = destination;
-        currentState = States.Walking;
-        SetAnimatorState("walk");
-        if (movementMode == Mode.RandomPointInFOW)
-            StartCoroutine(ChangeDirection());
+            Debug.LogError("Player not assigned");
+        if (npcType == NPCType.agressiveMonster || npcType == NPCType.non_agressiveMonster || npcType == NPCType.peacefulNPC)
+        {
+            SetPosition();
+            agent.destination = destination;
+            currentState = States.Walking;
+            if (animator != null)
+                SetAnimatorState("walk");
+            if (movementMode == Mode.RandomMovement)
+                StartCoroutine(ChangeDirection());
+        }
+        else
+        {
+            SetAnimatorState("idle");
+            StartCoroutine(ChangeIdleAnim());
+            targetDefined = false;
+        }
     }
 
-    // Update is called once per frame
-    void FixedUpdate()
+    void Update()
+    {
+        switch (npcType)
+        {
+            case NPCType.agressiveMonster:
+                MoveAI(targetDefined);
+                break;
+            case NPCType.non_agressiveMonster:
+                MoveAI(targetDefined, false);
+                break;
+            case NPCType.peacefulNPC:
+                MoveAI(false, false);
+                break;
+            case NPCType.standOnePlaceNPC:
+                //Add interaction system for your NPC here
+                break;
+            default:
+                break;
+        }
+    }
+    void MoveAI(bool enemyDefined, bool agressive = true, bool canMove = true)
     {
         switch (currentState)
         {
             case States.Stay:
-                MethodForIdle();
+                MethodForIdle(agressive, canMove);
                 break;
             case States.Walking:
-                MethodForWalking();
+                MethodForWalking(enemyDefined, agressive);
                 break;
             case States.Follow:
                 MethodForFollowPlayer();
@@ -86,9 +115,10 @@ public class MoveControl : MonoBehaviour
             case States.Attacking:
                 MethodForFighting();
                 break;
+            default:
+                break;
         }
     }
-
     Vector3 PickPosition()
     {
         NavMeshTriangulation navMeshData = NavMesh.CalculateTriangulation();
@@ -114,10 +144,10 @@ public class MoveControl : MonoBehaviour
                 if (hitInfo.transform == player)
                 {
                     StopAllCoroutines();
-                    SetAnimatorState("walk");
-                    currentState = States.Follow;
+                    if (animator != null)
+                        SetAnimatorState("walk");
+                    targetDefined = true;
                 }
-
             }
         }
     }
@@ -128,38 +158,6 @@ public class MoveControl : MonoBehaviour
         {
             case Mode.RandomMovement:
                 destination = PickPosition();
-                break;
-            case Mode.RandomPointInFOW:
-                destination = Vector3.zero;
-                while (destination == Vector3.zero)
-                {
-                    Vector3 direction = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f) * transform.forward;
-                    RaycastHit hitInfo;
-                    if (Physics.SphereCast(transform.position, 0.5f, direction, out hitInfo, maxDistanceForCast))
-                    {
-                        NavMeshHit nmHit;
-                        if (NavMesh.SamplePosition(hitInfo.point, out nmHit, 1.5f, NavMesh.AllAreas))
-                        {
-                            destination = nmHit.position;
-                        }
-                        else
-                        {
-                            destination = Vector3.zero;
-                        }
-                    }
-                    else
-                    {
-                        NavMeshHit nmHit;
-                        if (NavMesh.SamplePosition(transform.position + direction * maxDistanceForCast, out nmHit, 1.5f, NavMesh.AllAreas))
-                        {
-                            destination = nmHit.position;
-                        }
-                        else
-                        {
-                            destination = Vector3.zero;
-                        }
-                    }
-                }
                 break;
             case Mode.Waypoints:
                 destination = wayPoints[currentPoint].position;
@@ -174,49 +172,36 @@ public class MoveControl : MonoBehaviour
                 break;
         }
     }
-
-    void MethodForIdle()
-    {
-        CheckForPlayer();
-    }
-    void MethodForWalking()
-    {
-        distanceToDestination = Vector3.Distance(transform.position, destination);
-        if (distanceToDestination < 1f)
-        {
-            StartCoroutine(ChangePosition());
-        }
-        CheckForPlayer();
-    }
-    void MethodForFollowPlayer()
-    {
-        if (_ac.ChooseAttack() != -1)
-            range = _ac.attackType[_ac.ChooseAttack()].range;
-        if (Vector3.Distance(transform.position, player.position) <= range + 5f)
-        {
-            currentState = States.Attacking;
-        }
-        agent.destination = player.position;
-    }
-    void MethodForFighting()
-    {
-        MoveInBattle();
-
-    }
-
     IEnumerator ChangePosition()
     {
         if (currentState == States.Walking || currentState == States.Stay)
         {
-            currentState = States.Stay;
-            SetAnimatorState("idle");
             yield return new WaitForSeconds(timeForIdle);
-            SetAnimatorState("walk");
+
+            if (animator != null)
+                SetAnimatorState("walk");
             SetPosition();
             agent.destination = destination;
             currentState = States.Walking;
+
         }
         yield return null;
+    }
+
+    IEnumerator ChangeIdleAnim()
+    {
+        while (true)
+        {
+            float rand = Random.Range(0f, 100f);
+            if (rand < percentageOfChangeDirection)
+                changeAnim = true;
+            if (changeAnim == true)
+            {
+                SetAnimatorState("idle");
+                changeAnim = false;
+            }
+            yield return new WaitForSeconds(1f);
+        }
     }
     IEnumerator ChangeDirection()
     {
@@ -224,7 +209,7 @@ public class MoveControl : MonoBehaviour
         {
             if (currentState == States.Walking || currentState == States.Stay)
             {
-                int rand = Random.Range(0, 200);
+                float rand = Random.Range(0f, 100f);
                 if (rand < percentageOfChangeDirection)
                     changePath = true;
                 if (changePath == true)
@@ -233,11 +218,50 @@ public class MoveControl : MonoBehaviour
                     agent.destination = destination;
                     changePath = false;
                 }
-                yield return new WaitForSeconds(0.5f);
+                yield return new WaitForSeconds(1f);
 
             }
         }
     }
+    void MethodForIdle(bool agressive, bool canMove)
+    {
+        if (canMove)
+        {
+            StartCoroutine(ChangePosition());
+            if (agressive)
+            {
+                CheckForPlayer();
+            }
+        }
+    }
+    void MethodForWalking(bool enemyDefined, bool agressive = true)
+    {
+        distanceToDestination = Vector3.Distance(transform.position, destination);
+        if (distanceToDestination < 1f)
+        {
+            if (currentState == States.Walking || currentState == States.Stay)
+                currentState = States.Stay;
+        }
+        if (agressive)
+            CheckForPlayer();
+        if (enemyDefined)
+            currentState = States.Follow;
+    }
+    void MethodForFollowPlayer()
+    {
+        if (_ac.ChooseAttack() != -1)
+            range = _ac.attackType[_ac.ChooseAttack()].range;
+        if (Vector3.Distance(transform.position, player.position) <= range)
+        {
+            currentState = States.Attacking;
+        }
+        agent.destination = player.position;
+    }
+    void MethodForFighting()
+    {
+        MoveInBattle();
+    }
+
     bool destinationReached = true;
     void MoveInBattle()
     {
@@ -245,8 +269,6 @@ public class MoveControl : MonoBehaviour
         Vector3 directionNormalized = (player.position - transform.position).normalized;
         Physics.SphereCast(transform.position + new Vector3(0f, 0.5f, 0f), 0.3f, directionNormalized, out hitInfo, range);
         Debug.DrawRay(transform.position, directionNormalized);
-        if (hitInfo.transform != null)
-            Debug.Log((player.position - transform.position).magnitude.ToString() + ' ' + hitInfo.transform.ToString() + ' ' + range);
         Quaternion _rot = Quaternion.LookRotation(directionNormalized);
         if (_ac.ChooseAttack() != -1)
             range = _ac.attackType[_ac.ChooseAttack()].range;
@@ -264,14 +286,16 @@ public class MoveControl : MonoBehaviour
 
                 agent.enabled = false;
                 obstacle.enabled = true;
-                SetAnimatorState("battle_idle");
+                if (animator != null)
+                    SetAnimatorState("battle_idle");
             }
             else
             {
                 NavMeshHit nvhit;
                 if ((distanceToPlayer > range || hitInfo.transform != player) && NavMesh.SamplePosition(player.position, out nvhit, 1.5f, agent.areaMask))
                 {
-                    SetAnimatorState("walk");
+                    if (animator != null)
+                        SetAnimatorState("walk");
                     agent.destination = nvhit.position;
                 }
             }
@@ -285,7 +309,8 @@ public class MoveControl : MonoBehaviour
                 {
                     obstacle.enabled = false;
                     agent.enabled = true;
-                    SetAnimatorState("walk");
+                    if (animator != null)
+                        SetAnimatorState("walk");
                     agent.destination = player.position;
                 }
                 else
@@ -294,7 +319,8 @@ public class MoveControl : MonoBehaviour
                     {
                         obstacle.enabled = false;
                         agent.enabled = true;
-                        SetAnimatorState("walk");
+                        if (animator != null)
+                            SetAnimatorState("walk");
                         RaycastHit hhit;
                         if (!Physics.SphereCast(transform.position, 0.5f, transform.right, out hhit, 0.3f) || hhit.transform.tag != "wall")
                         {
@@ -322,8 +348,11 @@ public class MoveControl : MonoBehaviour
                                 {
                                     agent.enabled = false;
                                     obstacle.enabled = true;
-                                    if (Quaternion.Angle(transform.rotation, _rot) < 4f)
-                                        SetAnimatorState("battle_idle");
+                                    if (Quaternion.Angle(transform.rotation, _rot) < 1f)
+                                    {
+                                        if (animator != null)
+                                            SetAnimatorState("battle_idle");
+                                    }
                                     else
                                     {
                                         transform.rotation = Quaternion.Slerp(transform.rotation, _rot, Time.fixedDeltaTime * rotationSpeed);
@@ -338,7 +367,8 @@ public class MoveControl : MonoBehaviour
                         {
                             agent.enabled = false;
                             obstacle.enabled = true;
-                            SetAnimatorState("battle_idle");
+                            if (animator != null)
+                                SetAnimatorState("battle_idle");
                             if (Quaternion.Angle(transform.rotation, _rot) < 4f)
                             {
                                 _ac.Attack();
@@ -357,7 +387,8 @@ public class MoveControl : MonoBehaviour
                     obstacle.enabled = false;
                     agent.enabled = true;
                     agent.destination = player.position;
-                    SetAnimatorState("walk");
+                    if (animator != null)
+                        SetAnimatorState("walk");
                 }
             }
         }
@@ -396,9 +427,15 @@ public class MoveControl : MonoBehaviour
         }
     }
 }
-    public enum Mode
-    {
-        RandomMovement,
-        Waypoints,
-        RandomPointInFOW
-    }
+public enum Mode
+{
+    RandomMovement,
+    Waypoints,
+}
+public enum NPCType
+{
+    agressiveMonster,
+    non_agressiveMonster,
+    peacefulNPC,
+    standOnePlaceNPC
+}
